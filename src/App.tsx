@@ -25,7 +25,7 @@ export default function App() {
     setError(null);
 
     try {
-      const apiKey = import.meta.env.GEMINI_API_KEY;
+      const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
       
       if (!apiKey) {
         throw new Error("Missing VITE_GEMINI_API_KEY environment variable. Please configure it in Vercel settings.");

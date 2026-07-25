@@ -1,5 +1,5 @@
 import React, { useState, Component, ErrorInfo, ReactNode } from 'react';
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI, Type } from '@google/genai';
 import { Header } from './components/Header';
 import { DisclaimerBanner } from './components/DisclaimerBanner';
 import { LabInputSection } from './components/LabInputSection';
@@ -10,7 +10,6 @@ import { AnalysisResult } from './types';
 import { SAMPLE_REPORTS } from './data/sampleReports';
 import { Sparkles, AlertCircle, RefreshCw, Stethoscope, HeartPulse, CheckCircle2, ShieldCheck } from 'lucide-react';
 
-// Error Boundary to catch render crashes and prevent white screen
 interface ErrorBoundaryProps {
   children: ReactNode;
   onReset: () => void;
@@ -18,21 +17,17 @@ interface ErrorBoundaryProps {
 
 interface ErrorBoundaryState {
   hasError: boolean;
-  error: any;
 }
 
 class SafeDisplayBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  public state: ErrorBoundaryState = {
-    hasError: false,
-    error: null,
-  };
+  public state: ErrorBoundaryState = { hasError: false };
 
-  public static getDerivedStateFromError(error: any): ErrorBoundaryState {
-    return { hasError: true, error };
+  public static getDerivedStateFromError(): ErrorBoundaryState {
+    return { hasError: true };
   }
 
   public componentDidCatch(error: any, errorInfo: ErrorInfo) {
-    console.error("Display Error Caught:", error, errorInfo);
+    console.error("Display Render Error:", error, errorInfo);
   }
 
   public render() {
@@ -40,18 +35,18 @@ class SafeDisplayBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySta
       return (
         <div className="bg-rose-50 border border-rose-200 rounded-2xl p-6 mb-8 text-rose-900 text-center space-y-3">
           <AlertCircle className="w-8 h-8 text-rose-600 mx-auto" />
-          <h4 className="font-bold text-base">Display Formatting Error</h4>
+          <h4 className="font-bold text-base">Display Formatting Issue</h4>
           <p className="text-xs text-rose-800">
-            The AI generated a response, but the UI encountered a layout issue displaying it.
+            The AI response could not be rendered into the component. Please try running the analysis again.
           </p>
           <button
             onClick={() => {
-              this.setState({ hasError: false, error: null });
+              this.setState({ hasError: false });
               this.props.onReset();
             }}
             className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs rounded-xl transition-colors inline-flex items-center gap-1.5 cursor-pointer"
           >
-            <RefreshCw className="w-3.5 h-3.5" /> Reset and Try Again
+            <RefreshCw className="w-3.5 h-3.5" /> Try Again
           </button>
         </div>
       );
@@ -86,97 +81,79 @@ export default function App() {
 
       const prompt = `
 You are MediClear AI, an empathetic patient advocate and clinical communications assistant.
-Analyze the following laboratory report and return a structured JSON response.
+Analyze the following laboratory report.
 
 Lab Report Text:
 ${reportText}
 
 Patient Focus Area / Questions:
 ${userFocusArea.trim() || 'None provided'}
-
-CRITICAL REQUIREMENT: Output strictly valid JSON without any commentary or extra text. Format as:
-{
-  "summary": "A 2-3 paragraph plain English explanation written at a 6th-grade reading level.",
-  "findings": [
-    {
-      "testName": "Name of test (e.g. Glucose)",
-      "value": "Measured value (e.g. 108 mg/dL)",
-      "flag": "HIGH",
-      "referenceRange": "Standard reference interval (e.g. 70-99 mg/dL)",
-      "explanation": "Clear short explanation of what this test means."
-    }
-  ],
-  "doctorQuestions": [
-    "Question 1 for doctor",
-    "Question 2 for doctor"
-  ],
-  "jargonTerms": [
-    {
-      "term": "Medical term",
-      "definition": "Simple explanation"
-    }
-  ]
-}
 `;
 
       const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
         contents: prompt,
+        config: {
+          responseMimeType: 'application/json',
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              summary: {
+                type: Type.STRING,
+                description: "A 2-3 paragraph plain English explanation written at a 6th-grade reading level.",
+              },
+              findings: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    testName: { type: Type.STRING },
+                    value: { type: Type.STRING },
+                    flag: { type: Type.STRING, description: "HIGH, LOW, or NORMAL" },
+                    referenceRange: { type: Type.STRING },
+                    explanation: { type: Type.STRING },
+                  },
+                  required: ["testName", "value", "flag", "referenceRange", "explanation"],
+                },
+              },
+              doctorQuestions: {
+                type: Type.ARRAY,
+                items: { type: Type.STRING },
+              },
+              jargonTerms: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    term: { type: Type.STRING },
+                    definition: { type: Type.STRING },
+                  },
+                  required: ["term", "definition"],
+                },
+              },
+            },
+            required: ["summary", "findings", "doctorQuestions", "jargonTerms"],
+          },
+        },
       });
 
-      let responseText = response.text || '';
+      const responseText = response.text || '';
       
       if (!responseText) {
         throw new Error('No response returned from Gemini.');
       }
 
-      // Clean markdown fences
-      responseText = responseText.replace(/```json/gi, '').replace(/```/g, '').trim();
+      const parsedData = JSON.parse(responseText);
 
-      let parsedData: any;
-      try {
-        parsedData = JSON.parse(responseText);
-      } catch (jsonErr) {
-        console.error("Failed to parse JSON output:", responseText);
-        throw new Error("Received invalid format from AI. Please try clicking 'Retry Analysis'.");
-      }
-
-      // Safeguard & normalize data structure so UI never crashes on missing fields
-      const rawFindings = Array.isArray(parsedData.findings) 
-        ? parsedData.findings 
-        : (Array.isArray(parsedData.keyFindings) ? parsedData.keyFindings : []);
-
-      const safeFindings = rawFindings.map((f: any) => ({
-        testName: f.testName || f.parameter || f.name || f.test || 'Lab Test',
-        value: f.value || f.result || f.measuredValue || 'N/A',
-        flag: (f.flag || f.status || f.level || 'NORMAL').toString().toUpperCase(),
-        referenceRange: f.referenceRange || f.referenceInterval || f.range || 'N/A',
-        explanation: f.explanation || f.description || f.interpretation || '',
-        ...f
-      }));
-
-      const safeQuestions = Array.isArray(parsedData.doctorQuestions)
-        ? parsedData.doctorQuestions
-        : (Array.isArray(parsedData.questionsForDoctor) ? parsedData.questionsForDoctor : []);
-
-      const safeJargon = Array.isArray(parsedData.jargonTerms)
-        ? parsedData.jargonTerms
-        : (Array.isArray(parsedData.jargonGlossary) ? parsedData.jargonGlossary : []);
-
-      const safeResult: any = {
-        summary: parsedData.summary || parsedData.patientSummary || parsedData.overview || 'Analysis complete.',
-        findings: safeFindings,
-        keyFindings: safeFindings,
-        doctorQuestions: safeQuestions,
-        questionsForDoctor: safeQuestions,
-        jargonTerms: safeJargon,
-        jargonGlossary: safeJargon,
-        ...parsedData
+      // Add alias mappings so AnalysisOutput works regardless of parameter naming conventions
+      const normalizedResult: any = {
+        ...parsedData,
+        keyFindings: parsedData.findings || [],
+        questionsForDoctor: parsedData.doctorQuestions || [],
+        jargonGlossary: parsedData.jargonTerms || [],
       };
 
-      setAnalysisResult(safeResult as AnalysisResult);
-
-      // Scroll smoothly
+      setAnalysisResult(normalizedResult as AnalysisResult);
       window.scrollTo({ top: 220, behavior: 'smooth' });
     } catch (err: any) {
       console.error('Analysis error:', err);
@@ -321,7 +298,7 @@ CRITICAL REQUIREMENT: Output strictly valid JSON without any commentary or extra
               </>
             )}
 
-            {/* Analysis Output Results wrapped in Safety Boundary */}
+            {/* Analysis Output Results */}
             {analysisResult && (
               <SafeDisplayBoundary onReset={handleReset}>
                 <AnalysisOutput

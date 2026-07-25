@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, Component, ErrorInfo, ReactNode } from 'react';
 import { GoogleGenAI } from '@google/genai';
 import { Header } from './components/Header';
 import { DisclaimerBanner } from './components/DisclaimerBanner';
@@ -9,6 +9,57 @@ import { Footer } from './components/Footer';
 import { AnalysisResult } from './types';
 import { SAMPLE_REPORTS } from './data/sampleReports';
 import { Sparkles, AlertCircle, RefreshCw, Stethoscope, HeartPulse, CheckCircle2, ShieldCheck } from 'lucide-react';
+
+// Error Boundary to catch render crashes and prevent white screen
+interface ErrorBoundaryProps {
+  children: ReactNode;
+  onReset: () => void;
+}
+
+interface ErrorBoundaryState {
+  hasError: boolean;
+  error: any;
+}
+
+class SafeDisplayBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  public state: ErrorBoundaryState = {
+    hasError: false,
+    error: null,
+  };
+
+  public static getDerivedStateFromError(error: any): ErrorBoundaryState {
+    return { hasError: true, error };
+  }
+
+  public componentDidCatch(error: any, errorInfo: ErrorInfo) {
+    console.error("Display Error Caught:", error, errorInfo);
+  }
+
+  public render() {
+    if (this.state.hasError) {
+      return (
+        <div className="bg-rose-50 border border-rose-200 rounded-2xl p-6 mb-8 text-rose-900 text-center space-y-3">
+          <AlertCircle className="w-8 h-8 text-rose-600 mx-auto" />
+          <h4 className="font-bold text-base">Display Formatting Error</h4>
+          <p className="text-xs text-rose-800">
+            The AI generated a response, but the UI encountered a layout issue displaying it.
+          </p>
+          <button
+            onClick={() => {
+              this.setState({ hasError: false, error: null });
+              this.props.onReset();
+            }}
+            className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs rounded-xl transition-colors inline-flex items-center gap-1.5 cursor-pointer"
+          >
+            <RefreshCw className="w-3.5 h-3.5" /> Reset and Try Again
+          </button>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<'decoder' | 'glossary'>('decoder');
@@ -79,21 +130,53 @@ CRITICAL REQUIREMENT: Output strictly valid JSON without any commentary or extra
         throw new Error('No response returned from Gemini.');
       }
 
-      // Clean up markdown code fences if Gemini wraps JSON in ```json ... ```
+      // Clean markdown fences
       responseText = responseText.replace(/```json/gi, '').replace(/```/g, '').trim();
 
-      // Parse JSON safely inside try/catch so syntax bugs won't crash React
-      let parsedData: AnalysisResult;
+      let parsedData: any;
       try {
         parsedData = JSON.parse(responseText);
       } catch (jsonErr) {
         console.error("Failed to parse JSON output:", responseText);
-        throw new Error("Received an unexpected format from AI. Please try clicking 'Retry Analysis'.");
+        throw new Error("Received invalid format from AI. Please try clicking 'Retry Analysis'.");
       }
 
-      setAnalysisResult(parsedData);
+      // Safeguard & normalize data structure so UI never crashes on missing fields
+      const rawFindings = Array.isArray(parsedData.findings) 
+        ? parsedData.findings 
+        : (Array.isArray(parsedData.keyFindings) ? parsedData.keyFindings : []);
 
-      // Scroll to top of results smoothly
+      const safeFindings = rawFindings.map((f: any) => ({
+        testName: f.testName || f.parameter || f.name || f.test || 'Lab Test',
+        value: f.value || f.result || f.measuredValue || 'N/A',
+        flag: (f.flag || f.status || f.level || 'NORMAL').toString().toUpperCase(),
+        referenceRange: f.referenceRange || f.referenceInterval || f.range || 'N/A',
+        explanation: f.explanation || f.description || f.interpretation || '',
+        ...f
+      }));
+
+      const safeQuestions = Array.isArray(parsedData.doctorQuestions)
+        ? parsedData.doctorQuestions
+        : (Array.isArray(parsedData.questionsForDoctor) ? parsedData.questionsForDoctor : []);
+
+      const safeJargon = Array.isArray(parsedData.jargonTerms)
+        ? parsedData.jargonTerms
+        : (Array.isArray(parsedData.jargonGlossary) ? parsedData.jargonGlossary : []);
+
+      const safeResult: any = {
+        summary: parsedData.summary || parsedData.patientSummary || parsedData.overview || 'Analysis complete.',
+        findings: safeFindings,
+        keyFindings: safeFindings,
+        doctorQuestions: safeQuestions,
+        questionsForDoctor: safeQuestions,
+        jargonTerms: safeJargon,
+        jargonGlossary: safeJargon,
+        ...parsedData
+      };
+
+      setAnalysisResult(safeResult as AnalysisResult);
+
+      // Scroll smoothly
       window.scrollTo({ top: 220, behavior: 'smooth' });
     } catch (err: any) {
       console.error('Analysis error:', err);
@@ -238,12 +321,14 @@ CRITICAL REQUIREMENT: Output strictly valid JSON without any commentary or extra
               </>
             )}
 
-            {/* Analysis Output Results */}
+            {/* Analysis Output Results wrapped in Safety Boundary */}
             {analysisResult && (
-              <AnalysisOutput
-                result={analysisResult}
-                onReset={handleReset}
-              />
+              <SafeDisplayBoundary onReset={handleReset}>
+                <AnalysisOutput
+                  result={analysisResult}
+                  onReset={handleReset}
+                />
+              </SafeDisplayBoundary>
             )}
           </div>
         )}

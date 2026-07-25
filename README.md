@@ -48,3 +48,55 @@ Hosting & Deployment: Vercel
 
 Version Control: Git & GitHub
 
+# 🩺 MediClear AI
+
+MediClear AI is an empathetic patient advocate and clinical communications assistant. It takes complex, jargon-heavy laboratory reports and translates them into a highly readable, structured dashboard. Built with a focus on patient accessibility, it ensures users can understand their health data and arrive at their next doctor's appointment fully prepared.
+
+## ✨ Core Features
+
+*   **Plain English Translation:** Transforms intimidating medical terminology into a clear, 2-3 paragraph summary written at a 6th-grade reading level.
+*   **Key Findings & Ranges:** Extracts test results into a clean, color-coded table, clearly separating normal values from high/low flags alongside standard reference intervals.
+*   **Doctor Appointment Kit:** Generates tailored, specific questions for the patient to ask their physician based on the lab results, complete with a 1-click printable appointment summary sheet.
+*   **Jargon Glossary:** Automatically defines complex medical terms found in the specific report.
+*   **Crash-Proof UI Rendering:** Utilizes strict JSON schema enforcement to guarantee type-safe data pipelines directly from the LLM to the React frontend.
+
+## 🏗️ Architecture & Tech Stack
+
+This application utilizes a modern, serverless AI architecture, eliminating the need for a standalone backend router. 
+
+*   **Frontend:** React, TypeScript, Tailwind CSS, Lucide Icons
+*   **AI Engine:** Google Gemini 2.5 Flash (`@google/genai` SDK)
+*   **Execution Model:** Direct Agentic Execution — The application sends queries directly to the LLM, relying on strict `responseSchema` configurations (Structured Outputs) to guarantee the AI response maps perfectly to the frontend TypeScript interfaces.
+*   **Deployment:** Vercel
+
+## 🚀 Getting Started
+
+### Prerequisites
+*   Node.js (v18 or higher recommended)
+*   A Google Gemini API Key
+
+### Installation
+
+1. **Clone the repository:**
+   ```bash
+   git clone [https://github.com/yourusername/mediclear-ai.git](https://github.com/yourusername/mediclear-ai.git)
+   cd mediclear-ai
+
+Install dependencies:
+
+Bash
+npm install
+Configure Environment Variables:
+Create a .env file in the root directory and add your Gemini API key:
+
+Code snippet
+VITE_GEMINI_API_KEY=your_api_key_here
+Run the development server:
+
+Bash
+npm run dev
+The application will be available at http://localhost:5173 (or your configured Vite port).
+
+💡 Usage Context
+This repository represents an end-to-end original AI application. It is designed to demonstrate how large language models can be tightly integrated with front-end components using enforced JSON schemas to create reliable, consumer-facing tools in the digital health space.
+

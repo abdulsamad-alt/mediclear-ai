@@ -8,7 +8,23 @@ import { Footer } from './components/Footer';
 import { AnalysisResult } from './types';
 import { SAMPLE_REPORTS } from './data/sampleReports';
 import { Sparkles, AlertCircle, RefreshCw, Stethoscope, HeartPulse, CheckCircle2, ShieldCheck, ArrowRight } from 'lucide-react';
+import { GoogleGenAI } from '@google/genai';
 
+// Initialize Gemini with the Vite client key
+const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
+
+const handleAnalyze = async () => {
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: `Analyze lab report: ${reportText}`,
+    });
+
+    console.log(response.text);
+  } catch (err) {
+    console.error(err);
+  }
+};
 export default function App() {
   const [activeTab, setActiveTab] = useState<'decoder' | 'glossary'>('decoder');
   const [reportText, setReportText] = useState('');

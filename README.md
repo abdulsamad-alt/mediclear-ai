@@ -1,6 +1,6 @@
 # 🩺 MediClear AI — Patient Lab Report & Jargon Decoder
 
-> **Live Deployed App:**https://mediclear-ai-4sgx.vercel.app
+> **Live Deployed App:*https://mediclear-ai-4sgx.vercel.app?_vercel_share=lE4opVR8Eybw88tyZheiIbsEi9Zu65Rh
 > **Public GitHub Repository:**https://github.com/abdulsamad-alt/mediclear-ai
 
 ---

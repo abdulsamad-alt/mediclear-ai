@@ -19,11 +19,16 @@ interface ErrorBoundaryState {
   hasError: boolean;
 }
 
-class SafeDisplayBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  public state: ErrorBoundaryState = { hasError: false };
+interface ErrorBoundaryState {
+  hasError: boolean;
+  errorMessage: string;
+}
 
-  public static getDerivedStateFromError(): ErrorBoundaryState {
-    return { hasError: true };
+class SafeDisplayBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  public state: ErrorBoundaryState = { hasError: false, errorMessage: '' };
+
+  public static getDerivedStateFromError(error: any): ErrorBoundaryState {
+    return { hasError: true, errorMessage: error.toString() };
   }
 
   public componentDidCatch(error: any, errorInfo: ErrorInfo) {
@@ -35,18 +40,25 @@ class SafeDisplayBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySta
       return (
         <div className="bg-rose-50 border border-rose-200 rounded-2xl p-6 mb-8 text-rose-900 text-center space-y-3">
           <AlertCircle className="w-8 h-8 text-rose-600 mx-auto" />
-          <h4 className="font-bold text-base">Display Formatting Issue</h4>
-          <p className="text-xs text-rose-800">
-            The AI response could not be rendered into the component. Please try running the analysis again.
+          <h4 className="font-bold text-base">UI Crash Detected</h4>
+          
+          {/* THIS WILL PRINT THE EXACT ERROR ON SCREEN */}
+          <div className="bg-white/60 p-3 rounded-lg border border-rose-200 text-left font-mono text-xs text-rose-900 overflow-x-auto">
+            {this.state.errorMessage}
+          </div>
+          
+          <p className="text-sm font-semibold">
+            Bro, copy the exact red code error above and paste it to me!
           </p>
+          
           <button
             onClick={() => {
-              this.setState({ hasError: false });
+              this.setState({ hasError: false, errorMessage: '' });
               this.props.onReset();
             }}
             className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs rounded-xl transition-colors inline-flex items-center gap-1.5 cursor-pointer"
           >
-            <RefreshCw className="w-3.5 h-3.5" /> Try Again
+            <RefreshCw className="w-3.5 h-3.5" /> Reset UI
           </button>
         </div>
       );

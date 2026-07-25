@@ -18,7 +18,7 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
 
-  const handleAnalyze = async () => {
+ const handleAnalyze = async () => {
     if (!reportText.trim()) return;
 
     setIsLoading(true);
@@ -28,7 +28,7 @@ export default function App() {
       const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
       
       if (!apiKey) {
-        throw new Error("Missing VITE_GEMINI_API_KEY environment variable. Please configure it in Vercel settings.");
+        throw new Error("Missing VITE_GEMINI_API_KEY environment variable in Vercel.");
       }
 
       const ai = new GoogleGenAI({ apiKey });
@@ -43,31 +43,65 @@ ${reportText}
 Patient Focus Area / Questions:
 ${userFocusArea.trim() || 'None provided'}
 
-CRITICAL REQUIREMENT: Return ONLY a valid JSON object matching this exact schema:
+CRITICAL REQUIREMENT: Output strictly valid JSON without any commentary or extra text. Format as:
 {
   "summary": "A 2-3 paragraph plain English explanation written at a 6th-grade reading level.",
   "findings": [
     {
       "testName": "Name of test (e.g. Glucose)",
       "value": "Measured value (e.g. 108 mg/dL)",
-      "flag": "HIGH" | "LOW" | "NORMAL",
+      "flag": "HIGH",
       "referenceRange": "Standard reference interval (e.g. 70-99 mg/dL)",
       "explanation": "Clear short explanation of what this test means."
     }
   ],
   "doctorQuestions": [
     "Question 1 for doctor",
-    "Question 2 for doctor",
-    "Question 3 for doctor"
+    "Question 2 for doctor"
   ],
   "jargonTerms": [
     {
-      "term": "Medical term used in report",
-      "definition": "Simple 1-sentence translation"
+      "term": "Medical term",
+      "definition": "Simple explanation"
     }
   ]
 }
 `;
+
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: prompt,
+      });
+
+      let responseText = response.text || '';
+      
+      if (!responseText) {
+        throw new Error('No response returned from Gemini.');
+      }
+
+      // Safely strip markdown code fences if Gemini included ```json ... ```
+      responseText = responseText.replace(/```json/gi, '').replace(/```/g, '').trim();
+
+      // Try parsing JSON safely
+      let parsedData;
+      try {
+        parsedData = JSON.parse(responseText);
+      } catch (jsonErr) {
+        console.error("Failed to parse JSON output:", responseText);
+        throw new Error("Received an unexpected format from AI. Please try clicking 'Retry Analysis'.");
+      }
+
+      setAnalysisResult(parsedData);
+
+      // Scroll to top of results smoothly
+      window.scrollTo({ top: 220, behavior: 'smooth' });
+    } catch (err: any) {
+      console.error('Analysis error:', err);
+      setError(err.message || 'An unexpected error occurred while processing your report.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
       const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { GoogleGenAI } from '@google/genai';
 import { Header } from './components/Header';
 import { DisclaimerBanner } from './components/DisclaimerBanner';
 import { LabInputSection } from './components/LabInputSection';
@@ -7,7 +8,7 @@ import { JargonGlossary } from './components/JargonGlossary';
 import { Footer } from './components/Footer';
 import { AnalysisResult } from './types';
 import { SAMPLE_REPORTS } from './data/sampleReports';
-import { Sparkles, AlertCircle, RefreshCw, Stethoscope, HeartPulse, CheckCircle2, ShieldCheck, ArrowRight } from 'lucide-react';
+import { Sparkles, AlertCircle, RefreshCw, Stethoscope, HeartPulse, CheckCircle2, ShieldCheck } from 'lucide-react';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<'decoder' | 'glossary'>('decoder');
@@ -24,54 +25,67 @@ export default function App() {
     setError(null);
 
     try {
-     import { GoogleGenAI } from '@google/genai';
-
-// Inside your button click / submit handler:
-try {
-  const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-  if (!apiKey) {
-    throw new Error("Missing VITE_GEMINI_API_KEY in Vercel environment variables.");
-  }
-
-  const ai = new GoogleGenAI({ apiKey });
-
-  const prompt = `
-You are MediClear AI, an empathetic patient advocate and clinical communications assistant.
-Analyze this lab report and translate it into accessible, patient-friendly information.
-
-Lab Report:
-${reportText}
-
-User Focus / Questions:
-${userFocusArea || 'General analysis'}
-
-Format your response cleanly:
-1. Plain English Summary
-2. Key Metrics & Findings
-3. Questions for Your Doctor
-  `;
-
-  const response = await ai.models.generateContent({
-    model: 'gemini-2.5-flash',
-    contents: prompt,
-  });
-
-  // Set your original state variable with response.text
-  setAnalysisResult(response.text); 
-
-} catch (err: any) {
-  console.error("Analysis Error:", err);
-  setError(err.message || "Failed to analyze lab report.");
-}
-      });
-
-      const json = await response.json();
-
-      if (!response.ok || !json.success) {
-        throw new Error(json.error || 'Failed to analyze lab report. Please try again.');
+      const apiKey = import.meta.env.GEMINI_API_KEY;
+      
+      if (!apiKey) {
+        throw new Error("Missing VITE_GEMINI_API_KEY environment variable. Please configure it in Vercel settings.");
       }
 
-      setAnalysisResult(json.data);
+      const ai = new GoogleGenAI({ apiKey });
+
+      const prompt = `
+You are MediClear AI, an empathetic patient advocate and clinical communications assistant.
+Analyze the following laboratory report and return a structured JSON response.
+
+Lab Report Text:
+${reportText}
+
+Patient Focus Area / Questions:
+${userFocusArea.trim() || 'None provided'}
+
+CRITICAL REQUIREMENT: Return ONLY a valid JSON object matching this exact schema:
+{
+  "summary": "A 2-3 paragraph plain English explanation written at a 6th-grade reading level.",
+  "findings": [
+    {
+      "testName": "Name of test (e.g. Glucose)",
+      "value": "Measured value (e.g. 108 mg/dL)",
+      "flag": "HIGH" | "LOW" | "NORMAL",
+      "referenceRange": "Standard reference interval (e.g. 70-99 mg/dL)",
+      "explanation": "Clear short explanation of what this test means."
+    }
+  ],
+  "doctorQuestions": [
+    "Question 1 for doctor",
+    "Question 2 for doctor",
+    "Question 3 for doctor"
+  ],
+  "jargonTerms": [
+    {
+      "term": "Medical term used in report",
+      "definition": "Simple 1-sentence translation"
+    }
+  ]
+}
+`;
+
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: prompt,
+        config: {
+          responseMimeType: 'application/json',
+        },
+      });
+
+      const responseText = response.text;
+      
+      if (!responseText) {
+        throw new Error('No response returned from Gemini.');
+      }
+
+      const parsedData = JSON.parse(responseText);
+      setAnalysisResult(parsedData);
+
       // Scroll to top of results smoothly
       window.scrollTo({ top: 220, behavior: 'smooth' });
     } catch (err: any) {

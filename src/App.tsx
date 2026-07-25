@@ -18,7 +18,7 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
 
- const handleAnalyze = async () => {
+  const handleAnalyze = async () => {
     if (!reportText.trim()) return;
 
     setIsLoading(true);
@@ -79,11 +79,11 @@ CRITICAL REQUIREMENT: Output strictly valid JSON without any commentary or extra
         throw new Error('No response returned from Gemini.');
       }
 
-      // Safely strip markdown code fences if Gemini included ```json ... ```
+      // Clean up markdown code fences if Gemini wraps JSON in ```json ... ```
       responseText = responseText.replace(/```json/gi, '').replace(/```/g, '').trim();
 
-      // Try parsing JSON safely
-      let parsedData;
+      // Parse JSON safely inside try/catch so syntax bugs won't crash React
+      let parsedData: AnalysisResult;
       try {
         parsedData = JSON.parse(responseText);
       } catch (jsonErr) {
@@ -91,33 +91,6 @@ CRITICAL REQUIREMENT: Output strictly valid JSON without any commentary or extra
         throw new Error("Received an unexpected format from AI. Please try clicking 'Retry Analysis'.");
       }
 
-      setAnalysisResult(parsedData);
-
-      // Scroll to top of results smoothly
-      window.scrollTo({ top: 220, behavior: 'smooth' });
-    } catch (err: any) {
-      console.error('Analysis error:', err);
-      setError(err.message || 'An unexpected error occurred while processing your report.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: prompt,
-        config: {
-          responseMimeType: 'application/json',
-        },
-      });
-
-      const responseText = response.text;
-      
-      if (!responseText) {
-        throw new Error('No response returned from Gemini.');
-      }
-
-      const parsedData = JSON.parse(responseText);
       setAnalysisResult(parsedData);
 
       // Scroll to top of results smoothly
@@ -232,7 +205,7 @@ CRITICAL REQUIREMENT: Output strictly valid JSON without any commentary or extra
                         1. Plain English Translation
                       </h3>
                       <p className="text-xs text-slate-600 leading-relaxed">
-                        Transforms intimidating medical jargon (e.g. &quot;normocytic normochromic&quot;) into clear, 6th-grade level concepts.
+                        Transforms intimidating medical jargon into clear, 6th-grade level concepts.
                       </p>
                     </div>
 

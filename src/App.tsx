@@ -17,10 +17,6 @@ interface ErrorBoundaryProps {
 
 interface ErrorBoundaryState {
   hasError: boolean;
-}
-
-interface ErrorBoundaryState {
-  hasError: boolean;
   errorMessage: string;
 }
 
@@ -42,13 +38,12 @@ class SafeDisplayBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySta
           <AlertCircle className="w-8 h-8 text-rose-600 mx-auto" />
           <h4 className="font-bold text-base">UI Crash Detected</h4>
           
-          {/* THIS WILL PRINT THE EXACT ERROR ON SCREEN */}
           <div className="bg-white/60 p-3 rounded-lg border border-rose-200 text-left font-mono text-xs text-rose-900 overflow-x-auto">
             {this.state.errorMessage}
           </div>
           
           <p className="text-sm font-semibold">
-            Bro, copy the exact red code error above and paste it to me!
+            The AI response structure did not match what the components expected.
           </p>
           
           <button
@@ -110,11 +105,19 @@ ${userFocusArea.trim() || 'None provided'}
           responseSchema: {
             type: Type.OBJECT,
             properties: {
-              summary: {
-                type: Type.STRING,
-                description: "A 2-3 paragraph plain English explanation written at a 6th-grade reading level.",
+              reportTitle: { 
+                type: Type.STRING, 
+                description: "A short, clear title for this lab report (e.g., 'Comprehensive Metabolic Panel')" 
               },
-              findings: {
+              plainEnglishSummary: { 
+                type: Type.STRING, 
+                description: "A 2-3 paragraph plain English explanation written at a 6th-grade reading level. Use newline characters to separate paragraphs." 
+              },
+              overallHealthContext: { 
+                type: Type.STRING, 
+                description: "A 1-2 sentence positive, reassuring context about what this report generally indicates." 
+              },
+              keyFindings: {
                 type: Type.ARRAY,
                 items: {
                   type: Type.OBJECT,
@@ -131,6 +134,12 @@ ${userFocusArea.trim() || 'None provided'}
               doctorQuestions: {
                 type: Type.ARRAY,
                 items: { type: Type.STRING },
+                description: "3-4 tailored questions the patient should ask their doctor based on these results."
+              },
+              patientTips: {
+                type: Type.ARRAY,
+                items: { type: Type.STRING },
+                description: "2-3 general wellness or preparation tips for the patient's next doctor visit."
               },
               jargonTerms: {
                 type: Type.ARRAY,
@@ -144,7 +153,15 @@ ${userFocusArea.trim() || 'None provided'}
                 },
               },
             },
-            required: ["summary", "findings", "doctorQuestions", "jargonTerms"],
+            required: [
+              "reportTitle", 
+              "plainEnglishSummary", 
+              "overallHealthContext", 
+              "keyFindings", 
+              "doctorQuestions", 
+              "patientTips",
+              "jargonTerms"
+            ],
           },
         },
       });
@@ -156,16 +173,8 @@ ${userFocusArea.trim() || 'None provided'}
       }
 
       const parsedData = JSON.parse(responseText);
-
-      // Add alias mappings so AnalysisOutput works regardless of parameter naming conventions
-      const normalizedResult: any = {
-        ...parsedData,
-        keyFindings: parsedData.findings || [],
-        questionsForDoctor: parsedData.doctorQuestions || [],
-        jargonGlossary: parsedData.jargonTerms || [],
-      };
-
-      setAnalysisResult(normalizedResult as AnalysisResult);
+      setAnalysisResult(parsedData as AnalysisResult);
+      
       window.scrollTo({ top: 220, behavior: 'smooth' });
     } catch (err: any) {
       console.error('Analysis error:', err);
@@ -310,7 +319,7 @@ ${userFocusArea.trim() || 'None provided'}
               </>
             )}
 
-            {/* Analysis Output Results */}
+            {/* Analysis Output Results wrapped in Safety Boundary */}
             {analysisResult && (
               <SafeDisplayBoundary onReset={handleReset}>
                 <AnalysisOutput
